@@ -43,6 +43,24 @@
         mapHeight: 10000,
         currentFormat: { w: 1080, h: 1920 },
         currentTheme: 'colors',
+        bgAnim: 'none',
+        stars: [],
+        bgParticles: [],
+
+        // --- COLORES PERSONALIZADOS ---
+        colors: {
+            bg: "#0c0c0e",
+            wall: "#151520",
+            rampa: "#ffffff",
+            plinko: "#ffffff",
+            molino: "#ffffff",
+            vortex: "#00f2ff",
+            anillo: "#ffffff",
+            bumper: "#ffffff"
+        },
+
+        // --- GESTIÓN DE CANICAS ---
+        marblePool: [],
 
         // --- CONFIGURACIÓN ---
         MARBLE_RADIUS: 35,
@@ -118,9 +136,124 @@
             };
         }
 
+        // --- Modal de Colores ---
+        const btnOpen = document.getElementById('btnOpenColors');
+        const btnClose = document.getElementById('btnCloseColors');
+        const modal = document.getElementById('modal-colors');
+
+        if (btnOpen && btnClose && modal) {
+            btnOpen.onclick = () => modal.classList.add('active');
+            btnClose.onclick = () => modal.classList.remove('active');
+            window.onclick = (e) => { if (e.target === modal) modal.classList.remove('active'); };
+        }
+
+        // Sincronización de inputs de color
+        const colorIds = {
+            colorBg: 'bg', colorWall: 'wall', colorRamp: 'rampa',
+            colorPlinko: 'plinko', colorWindmill: 'molino',
+            colorVortex: 'vortex', colorRing: 'anillo', colorBumper: 'bumper'
+        };
+        Object.entries(colorIds).forEach(([id, key]) => {
+            const el = document.getElementById(id);
+            if (el) el.oninput = (e) => State.colors[key] = e.target.value;
+        });
+
+        const bgSelect = document.getElementById('bgAnimSelect');
+        if (bgSelect) bgSelect.onchange = (e) => State.bgAnim = e.target.value;
+
+        const marbleInput = document.getElementById('marbleCount');
+        if (marbleInput) {
+            marbleInput.oninput = (e) => {
+                const val = parseInt(e.target.value) || 1;
+                const capped = Math.max(1, Math.min(50, val));
+                e.target.value = capped;
+                // Sincronizar selección en el pool (los primeros N)
+                State.marblePool.forEach((p, i) => p.selected = i < capped);
+            };
+        }
+
+        // Inicializar elementos de fondo
+        for (let i = 0; i < 200; i++) {
+            State.stars.push({ x: Math.random() * 2000, y: Math.random() * 10000, s: 1 + Math.random() * 3, o: Math.random() });
+        }
+        for (let i = 0; i < 30; i++) {
+            State.bgParticles.push({
+                x: Math.random() * 2000, y: Math.random() * 10000,
+                r: 40 + Math.random() * 100,
+                v: 0.5 + Math.random() * 1,
+                o: 0.1 + Math.random() * 0.2
+            });
+        }
+
+        const btnOpenMarbles = document.getElementById('btnOpenMarbles');
+        const btnCloseMarbles = document.getElementById('btnCloseMarbles');
+        const btnSaveMarbles = document.getElementById('btnSaveMarbles');
+        const modalMarbles = document.getElementById('modal-marbles');
+
+        if (btnOpenMarbles && modalMarbles) {
+            btnOpenMarbles.onclick = () => {
+                renderMarblePool();
+                modalMarbles.classList.add('active');
+            };
+        }
+        if (btnCloseMarbles) btnCloseMarbles.onclick = () => modalMarbles.classList.remove('active');
+        if (btnSaveMarbles) btnSaveMarbles.onclick = () => {
+            saveMarbleSelection();
+            modalMarbles.classList.remove('active');
+        };
+
+        // Inicializar Pool de Canicas (50)
+        initMarblePool();
+
         updateCanvas();
         loadResources();
         requestAnimationFrame(loop);
+    }
+
+    function initMarblePool() {
+        const count = 50;
+        State.marblePool = [];
+        for (let i = 0; i < count; i++) {
+            const h = (i * 137.5) % 360;
+            State.marblePool.push({
+                index: i,
+                name: `Canica #${i + 1}`,
+                color: `hsl(${h}, 70%, 50%)`,
+                selected: i < 10
+            });
+        }
+    }
+
+    function renderMarblePool() {
+        const list = document.getElementById('marble-pool-list');
+        if (!list) return;
+        list.innerHTML = '';
+        State.marblePool.forEach(p => {
+            const item = document.createElement('div');
+            item.className = 'marble-item';
+            item.innerHTML = `
+                <input type="checkbox" ${p.selected ? 'checked' : ''} data-index="${p.index}">
+                <div class="marble-preview-dot" style="background: ${p.color}"></div>
+                <input type="text" value="${p.name}" data-index="${p.index}">
+            `;
+            list.appendChild(item);
+        });
+    }
+
+    function saveMarbleSelection() {
+        const list = document.getElementById('marble-pool-list');
+        const items = list.querySelectorAll('.marble-item');
+        let selectedCount = 0;
+        items.forEach(item => {
+            const cb = item.querySelector('input[type="checkbox"]');
+            const nameInp = item.querySelector('input[type="text"]');
+            const idx = parseInt(cb.dataset.index);
+
+            State.marblePool[idx].selected = cb.checked;
+            State.marblePool[idx].name = nameInp.value;
+            if (cb.checked) selectedCount++;
+        });
+        document.getElementById('marbleCount').value = selectedCount;
     }
 
     function updateCanvas() {
@@ -192,7 +325,7 @@
         State.viewY = 0;
 
         createMap(mSeed);
-        createMarbles(rSeed, count);
+        createMarbles(rSeed);
         State.marbles.forEach(m => cacheMarbleTexture(m));
 
         // Registro de colisiones para iluminación reactiva
@@ -246,10 +379,11 @@
         while (y < h - 1200) {
             const dice = rand();
             if (dice < 0.2) {
-                // RAMPAS (Ajustadas al baseW)
-                const pw = baseW * 0.4;
-                const px = offsetX + (rand() < 0.5 ? pw / 2 : baseW - pw / 2);
-                const angle = (0.35 + rand() * 0.3) * (px < w / 2 ? 1 : -1);
+                // RAMPAS (Unidas a la pared)
+                const pw = baseW * 0.5; // Más anchas para asegurar unión
+                const isLeft = rand() < 0.5;
+                const px = isLeft ? offsetX + pw / 2 - 50 : offsetX + baseW - pw / 2 + 50;
+                const angle = (0.35 + rand() * 0.3) * (isLeft ? 1 : -1);
                 const rampa = Matter.Bodies.rectangle(px, y, pw, 45, { isStatic: true, angle: angle, label: 'rampa' });
                 rampa.glowLife = 0; rampa.glowColor = '#fff';
                 Matter.Composite.add(State.world, rampa);
@@ -336,33 +470,47 @@
             y += rand() * 200;
         }
 
-        // Bloque de Seguridad antes de la meta (Embudo Aesthetic Centrado)
+        // Bloque de Seguridad antes de la meta (Embudo Aesthetic Unido a Paredes)
         Matter.Composite.add(State.world, [
-            Matter.Bodies.rectangle(offsetX + baseW * 0.1, h - 600, baseW * 0.3, 45, { isStatic: true, angle: 0.5, label: 'wall' }),
-            Matter.Bodies.rectangle(offsetX + baseW * 0.9, h - 600, baseW * 0.3, 45, { isStatic: true, angle: -0.5, label: 'wall' })
+            Matter.Bodies.rectangle(offsetX + baseW * 0.05, h - 600, baseW * 0.4, 45, { isStatic: true, angle: 0.5, label: 'wall' }),
+            Matter.Bodies.rectangle(offsetX + baseW * 0.95, h - 600, baseW * 0.4, 45, { isStatic: true, angle: -0.5, label: 'wall' })
         ]);
 
-        Matter.Composite.add(State.world, Matter.Bodies.rectangle(w / 2, h - 100, w * 3, 30, { isStatic: true, isSensor: true, label: 'finish' }));
+        Matter.Composite.add(State.world, Matter.Bodies.rectangle(w / 2, h - 100, w * 3, 100, { isStatic: true, isSensor: true, label: 'finish' }));
     }
 
-    function createMarbles(seed, count) {
+    function createMarbles(seed) {
         const rand = getSeedFunction(seed);
         const w = State.currentFormat.w;
-        const colors = ['#f05', '#0ef', '#fc0', '#0f6', '#a0f', '#f60', '#06f', '#fff', '#f3c', '#3f9'];
-        for (let i = 0; i < count; i++) {
+        const selectedMarbles = State.marblePool.filter(p => p.selected);
+
+        selectedMarbles.forEach((config, i) => {
             const mx = w * 0.2 + w * 0.6 * rand();
-            const marble = Matter.Bodies.circle(mx, 100 + i * 10, State.MARBLE_RADIUS, { restitution: 0.5, friction: 0.005, frictionAir: 0.001, label: 'marble-' + i });
-            marble.customColor = colors[i % colors.length];
+            const marble = Matter.Bodies.circle(mx, 100 + i * 10, State.MARBLE_RADIUS, {
+                restitution: 0.5, friction: 0.005, frictionAir: 0.001,
+                label: 'marble-' + config.index
+            });
+
+            marble.customColor = config.color;
+            marble.customName = config.name;
             State.trailData.set(marble.id, []);
+
             if (State.currentTheme === 'emojis') {
-                marble.customType = 'emoji'; marble.customContent = State.THEMES.emojis[i % State.THEMES.emojis.length]; marble.customName = marble.customContent;
+                marble.customType = 'emoji';
+                marble.customContent = State.THEMES.emojis[config.index % State.THEMES.emojis.length];
+                // El nombre sigue siendo el personalizado, no el emoji
             } else if (State.currentTheme === 'countries') {
-                marble.customType = 'flag'; const c = State.THEMES.countries[i % State.THEMES.countries.length]; marble.customContent = State.flagImages[c.id]; marble.customName = c.name;
+                marble.customType = 'flag';
+                const c = State.THEMES.countries[config.index % State.THEMES.countries.length];
+                marble.customContent = State.flagImages[c.id];
+                // El nombre sigue siendo el personalizado, no el país (o podrías combinarlo)
             } else {
-                marble.customType = 'color'; marble.customName = ["Rojo", "Cian", "Oro", "Lima", "Púrpura", "Naranja", "Azul", "Blanco", "Rosa", "Menta"][i % 10];
+                marble.customType = 'color';
             }
-            State.marbles.push(marble); Matter.Composite.add(State.world, marble);
-        }
+
+            State.marbles.push(marble);
+            Matter.Composite.add(State.world, marble);
+        });
     }
 
     function loop(timestamp) {
@@ -371,7 +519,8 @@
         const deltaTime = timestamp - lastTime;
         if (deltaTime >= frameInterval) {
             lastTime = timestamp - (deltaTime % frameInterval);
-            if (!State.raceFinished && !State.showPodium && State.marbles.length > 0) {
+            // Ya no bloqueamos la física por raceFinished
+            if (State.marbles.length > 0) {
                 const steps = Math.floor(State.PHYSICS_FPS / State.TARGET_FPS);
                 const physDelta = 1000 / State.PHYSICS_FPS;
                 for (let s = 0; s < steps; s++) {
@@ -448,10 +597,78 @@
         }
     }
 
-    function render() {
+    function drawBackground() {
         const ctx = State.ctx;
-        ctx.fillStyle = "#0a0a0c";
-        ctx.fillRect(0, 0, State.currentFormat.w, State.currentFormat.h);
+        const w = State.canvas.width;
+        const h = State.canvas.height;
+        const yOffset = State.viewY;
+
+        // Fondo base personalizado
+        ctx.fillStyle = State.colors.bg;
+        ctx.fillRect(0, 0, w, h);
+
+        if (State.bgAnim === 'none') return;
+
+        if (State.bgAnim === 'stars') {
+            // Capa 1: Nebulosa sutil
+            const grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w);
+            grad.addColorStop(0, "rgba(20, 0, 40, 0.4)");
+            grad.addColorStop(1, "transparent");
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+
+            // Capa 2: Estrellas Parallax
+            ctx.fillStyle = "#fff";
+            State.stars.forEach(s => {
+                const sy = (s.y - yOffset * 0.3) % h;
+                const finalY = sy < 0 ? sy + h : sy;
+                ctx.globalAlpha = s.o * (0.5 + 0.5 * Math.sin(Date.now() * 0.001 + s.x));
+                ctx.beginPath();
+                ctx.arc(s.x % w, finalY, s.s, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        if (State.bgAnim === 'grid') {
+            ctx.strokeStyle = "rgba(0, 242, 255, 0.15)";
+            ctx.lineWidth = 2;
+            const size = 150;
+            const scroll = (yOffset * 0.5) % size;
+
+            ctx.beginPath();
+            for (let x = 0; x <= w; x += size) {
+                ctx.moveTo(x, 0); ctx.lineTo(x, h);
+            }
+            for (let y = -scroll; y <= h; y += size) {
+                ctx.moveTo(0, y); ctx.lineTo(w, y);
+            }
+            ctx.stroke();
+
+            // Brillo en intersecciones (fijo)
+            ctx.fillStyle = "rgba(0, 242, 255, 0.05)";
+            for (let x = 0; x <= w; x += size * 2) {
+                for (let y = -scroll; y <= h; y += size * 2) {
+                    ctx.fillRect(x - 10, y - 10, 20, 20);
+                }
+            }
+        }
+
+        if (State.bgAnim === 'particles') {
+            State.bgParticles.forEach(p => {
+                const py = (p.y - yOffset * 0.2 - Date.now() * 0.02 * p.v) % h;
+                const finalY = py < 0 ? py + h : py;
+                ctx.fillStyle = "rgba(255, 255, 255, " + p.o + ")";
+                ctx.beginPath();
+                ctx.arc(p.x % w, finalY, p.r, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+    }
+
+    function render() {
+        drawBackground();
+        const ctx = State.ctx;
         ctx.save();
         ctx.translate(0, -State.viewY);
 
@@ -477,19 +694,24 @@
                 // Dibujar Vortex (Huiracán animado)
                 ctx.save();
                 ctx.translate(b.position.x, b.position.y);
+                b.rotation = (b.rotation || 0) + 0.05;
                 ctx.rotate(b.rotation);
-                ctx.globalAlpha = 0.3;
+                const r = b.vortexRadius;
+                const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+                grad.addColorStop(0, "transparent");
+                grad.addColorStop(0.5, State.colors.vortex + "33");
+                grad.addColorStop(1, "transparent");
+                ctx.fillStyle = grad;
+                ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = State.colors.vortex; ctx.lineWidth = 2; ctx.globalAlpha = 0.3;
 
                 for (let i = 0; i < 3; i++) {
                     ctx.beginPath();
-                    ctx.arc(0, 0, b.vortexRadius * (0.4 + i * 0.3), 0, Math.PI * 1.5);
-                    ctx.strokeStyle = "#fff";
-                    ctx.lineWidth = 15 - i * 4;
+                    ctx.arc(0, 0, r * (0.4 + i * 0.3), 0, Math.PI * 1.5);
                     ctx.stroke();
                     ctx.rotate(Math.PI * 0.5);
                 }
-
-                ctx.restore();
+                ctx.globalAlpha = 1.0; ctx.restore();
             } else {
                 // Soporte para cuerpos compuestos y otros obstáculos
                 const drawPart = (part) => {
@@ -504,13 +726,37 @@
                         ctx.fillStyle = b.glowColor;
                     } else {
                         ctx.shadowBlur = 0;
-                        if (b.label === 'bumper') {
-                            ctx.fillStyle = "#333";
-                            ctx.strokeStyle = "#555";
+                        const label = b.label || '';
+                        let color = State.colors.wall;
+                        if (label === 'rampa') color = State.colors.rampa;
+                        else if (label === 'plinko') color = State.colors.plinko;
+                        else if (label === 'molino') color = State.colors.molino;
+                        else if (label === 'anillo') color = State.colors.anillo;
+                        else if (label === 'bumper') color = State.colors.bumper;
+                        else if (label === 'finish') {
+                            ctx.save();
+                            const b_bounds = b.bounds;
+                            const b_w = b_bounds.max.x - b_bounds.min.x;
+                            const b_h = b_bounds.max.y - b_bounds.min.y;
+                            const sqSize = 50;
+                            ctx.beginPath();
+                            ctx.rect(b_bounds.min.x, b_bounds.min.y, b_w, b_h);
+                            ctx.clip();
+                            for (let Row = 0; Row < b_h / sqSize; Row++) {
+                                for (let Col = 0; Col < b_w / sqSize + 10; Col++) {
+                                    ctx.fillStyle = (Row + Col) % 2 === 0 ? "#fff" : "#000";
+                                    ctx.fillRect(b_bounds.min.x + Col * sqSize, b_bounds.min.y + Row * sqSize, sqSize, sqSize);
+                                }
+                            }
+                            ctx.restore();
+                            return; // No llenar con el fill general
+                        }
+
+                        ctx.fillStyle = color;
+                        if (label === 'bumper') {
+                            ctx.strokeStyle = "rgba(255,255,255,0.2)";
                             ctx.lineWidth = 5;
                             ctx.stroke();
-                        } else {
-                            ctx.fillStyle = b.label === 'finish' ? "#f05" : (b.label === 'wall' ? "#0f0f12" : "#222");
                         }
                     }
                     ctx.fill();
@@ -637,7 +883,26 @@
         const ctx = State.ctx;
         const w = State.currentFormat.w, h = State.currentFormat.h, fade = State.podiumAlpha;
         ctx.save(); ctx.globalAlpha = fade;
-        ctx.fillStyle = "rgba(0,0,0,0.98)"; ctx.fillRect(0, 0, w, h);
+
+        // --- Efecto Blur Cristal para el Podio (Sin Bordes) ---
+        if (ctx.filter !== undefined) {
+            if (!State.podiumBlurCanvas) State.podiumBlurCanvas = document.createElement('canvas');
+            State.podiumBlurCanvas.width = w;
+            State.podiumBlurCanvas.height = h;
+            const pctx = State.podiumBlurCanvas.getContext('2d');
+            pctx.drawImage(State.canvas, 0, 0);
+
+            ctx.save();
+            ctx.translate(w / 2, h / 2);
+            ctx.scale(1.15, 1.15);
+            ctx.filter = `blur(35px) brightness(0.4)`;
+            ctx.drawImage(State.podiumBlurCanvas, -w / 2, -h / 2);
+            ctx.restore();
+            ctx.filter = 'none';
+        } else {
+            ctx.fillStyle = "rgba(0,0,0,0.8)";
+            ctx.fillRect(0, 0, w, h);
+        }
 
         // Escala responsiva basada en la altura
         const sFac = h / 1920;

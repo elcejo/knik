@@ -41,7 +41,10 @@
                 </div>
                 <div class="input-group">
                     <label>Número de Canicas (1-50)</label>
-                    <input type="number" id="marbleCount" value="10" min="1" max="50">
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <input type="number" id="marbleCount" value="10" min="1" max="50">
+                        <button id="btnOpenMarbles" class="secondary icon-btn" title="Configurar Canicas">⚙️</button>
+                    </div>
                 </div>
                 <div class="input-group">
                     <label>Semilla del Mapa</label>
@@ -66,6 +69,7 @@
                         <option value="countries">Países (Banderas Reales)</option>
                     </select>
                 </div>
+                <button id="btnOpenColors" class="secondary" style="margin-top:10px">🎨 Configurar Colores</button>
             </div>
         </details>
 
@@ -77,10 +81,94 @@
         <div id="status">Esperando...</div>
     </div>
 
+    <!-- Modal de Personalización de Colores -->
+    <div id="modal-colors" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Personalización Visual</h2>
+                <button id="btnCloseColors" class="close-btn">✕</button>
+            </div>
+
+            <div class="modal-body">
+                <div class="color-section">
+                    <h3>Ambiente</h3>
+                    <div class="input-row">
+                        <label>Fondo Base</label>
+                        <input type="color" id="colorBg" value="#0c0c0e">
+                    </div>
+                    <div class="input-row">
+                        <label>Paredes</label>
+                        <input type="color" id="colorWall" value="#151520">
+                    </div>
+                    <div class="input-row">
+                        <label>Fondo Animado</label>
+                        <select id="bgAnimSelect">
+                            <option value="none" selected>Ninguno (Liso)</option>
+                            <option value="stars">Nebulosa Estelar (Parallax)</option>
+                            <option value="grid">Cyber-Grid (Retro-Futurista)</option>
+                            <option value="particles">Partículas Bokeh (Suave)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="color-section">
+                    <h3>Obstáculos</h3>
+                    <div class="grid-inputs">
+                        <div class="input-group">
+                            <label>Rampas</label>
+                            <input type="color" id="colorRamp" value="#ffffff">
+                        </div>
+                        <div class="input-group">
+                            <label>Plinkos</label>
+                            <input type="color" id="colorPlinko" value="#ffffff">
+                        </div>
+                        <div class="input-group">
+                            <label>Molinos</label>
+                            <input type="color" id="colorWindmill" value="#ffffff">
+                        </div>
+                        <div class="input-group">
+                            <label>Vortex</label>
+                            <input type="color" id="colorVortex" value="#00f2ff">
+                        </div>
+                        <div class="input-group">
+                            <label>Anillos</label>
+                            <input type="color" id="colorRing" value="#ffffff">
+                        </div>
+                        <div class="input-group">
+                            <label>Bumpers</label>
+                            <input type="color" id="colorBumper" value="#ffffff">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <button id="sidebar-toggle">☰</button>
 
     <div id="canvas-container">
         <canvas id="raceCanvas"></canvas>
+    </div>
+
+    <!-- Modal de Selección de Canicas -->
+    <div id="modal-marbles" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Gestión de Competidores</h2>
+                <button id="btnCloseMarbles" class="close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 15px; font-size: 0.9em; opacity: 0.8;">Selecciona quiénes participan y
+                    personaliza sus nombres.</p>
+                <div id="marble-pool-list" class="marble-list">
+                    <!-- Dinámico desde JS -->
+                </div>
+            </div>
+            <div class="modal-footer"
+                style="padding: 15px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: flex-end;">
+                <button id="btnSaveMarbles" class="primary">Guardar Selección</button>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>
