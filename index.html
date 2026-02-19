@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knik - Marble Race Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+</head>
+
+<body>
+
+    <div id="ui-overlay">
+        <button id="sidebar-toggle">✕</button>
+        <h1>Knik</h1>
+
+        <details open>
+            <summary>Composición</summary>
+            <div class="details-content">
+                <div class="input-group">
+                    <label>Formato de Video</label>
+                    <div class="format-selector">
+                        <button class="format-btn active" data-format="vertical">9:16</button>
+                        <button class="format-btn" data-format="square">1:1</button>
+                        <button class="format-btn" data-format="horizontal">16:9</button>
+                    </div>
+                </div>
+            </div>
+        </details>
+
+        <details open>
+            <summary>Configuraciones</summary>
+            <div class="details-content">
+                <div class="input-group">
+                    <label>Longitud de Carrera</label>
+                    <select id="lengthSelect">
+                        <option value="3000">Corto (Express)</option>
+                        <option value="10000" selected>Medio (Estándar)</option>
+                        <option value="25000">Largo (Maratón)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Número de Canicas (1-50)</label>
+                    <input type="number" id="marbleCount" value="10" min="1" max="50">
+                </div>
+                <div class="input-group">
+                    <label>Semilla del Mapa</label>
+                    <input type="text" id="mapSeed" placeholder="Mapa">
+                </div>
+                <div class="input-group">
+                    <label>Semilla de la Carrera</label>
+                    <input type="text" id="raceSeed" placeholder="Carrera">
+                </div>
+                <button id="btnRandomize" class="secondary" style="margin-top:5px">🎲 Aleatorizar</button>
+            </div>
+        </details>
+
+        <details open>
+            <summary>Personalización</summary>
+            <div class="details-content">
+                <div class="input-group">
+                    <label>Tema de la Carrera</label>
+                    <select id="themeSelect">
+                        <option value="colors">Clásico (Colores)</option>
+                        <option value="emojis">Emojis</option>
+                        <option value="countries">Países (Banderas Reales)</option>
+                    </select>
+                </div>
+            </div>
+        </details>
+
+        <div class="action-buttons">
+            <button id="btnPreview" class="secondary">Previsualizar</button>
+            <button id="btnRecord" class="primary">Generar y Grabar</button>
+        </div>
+
+        <div id="status">Esperando...</div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="raceCanvas"></canvas>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
