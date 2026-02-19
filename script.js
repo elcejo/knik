@@ -110,7 +110,13 @@
 
         const toggle = document.getElementById('sidebar-toggle');
         const overlay = document.getElementById('ui-overlay');
-        if (toggle && overlay) toggle.onclick = () => overlay.classList.toggle('collapsed');
+
+        if (toggle && overlay) {
+            toggle.onclick = () => {
+                const isCollapsed = overlay.classList.toggle('collapsed');
+                toggle.innerText = isCollapsed ? '☰' : '✕';
+            };
+        }
 
         updateCanvas();
         loadResources();
@@ -225,27 +231,31 @@
         const h = State.mapHeight;
         const t = State.WALL_THICKNESS;
 
+        // Carril central constante para mantener proporciones en cualquier formato
+        const baseW = 1080;
+        const offsetX = (w - baseW) / 2;
+
         // Limites reforzados (Paredes y Techo)
         Matter.Composite.add(State.world, [
-            Matter.Bodies.rectangle(-t / 2, h / 2, t, h, { isStatic: true, label: 'wall' }),
-            Matter.Bodies.rectangle(w + t / 2, h / 2, t, h, { isStatic: true, label: 'wall' }),
-            Matter.Bodies.rectangle(w / 2, -t / 2, w + t * 2, t, { isStatic: true, label: 'wall' })
+            Matter.Bodies.rectangle(offsetX - t / 2, h / 2, t, h, { isStatic: true, label: 'wall' }),
+            Matter.Bodies.rectangle(offsetX + baseW + t / 2, h / 2, t, h, { isStatic: true, label: 'wall' }),
+            Matter.Bodies.rectangle(w / 2, -t / 2, w + t * 4, t, { isStatic: true, label: 'wall' })
         ]);
 
         let y = 600;
         while (y < h - 1200) {
             const dice = rand();
             if (dice < 0.2) {
-                // RAMPAS
-                const pw = w * 0.45;
-                const px = rand() < 0.5 ? pw / 2 : w - pw / 2;
+                // RAMPAS (Ajustadas al baseW)
+                const pw = baseW * 0.4;
+                const px = offsetX + (rand() < 0.5 ? pw / 2 : baseW - pw / 2);
                 const angle = (0.35 + rand() * 0.3) * (px < w / 2 ? 1 : -1);
-                const rampa = Matter.Bodies.rectangle(px, y, pw, 60, { isStatic: true, angle: angle, label: 'rampa' });
+                const rampa = Matter.Bodies.rectangle(px, y, pw, 45, { isStatic: true, angle: angle, label: 'rampa' });
                 rampa.glowLife = 0; rampa.glowColor = '#fff';
                 Matter.Composite.add(State.world, rampa);
                 y += 500;
             } else if (dice < 0.35) {
-                // PLINKOS
+                // PLINKOS (Centrados en el carril)
                 const rows = 5;
                 const baseCols = 6;
                 const gapX = 130;
@@ -254,7 +264,7 @@
                     const isOddRow = (r % 2 !== 0);
                     const numCols = isOddRow ? baseCols + 1 : baseCols;
                     const rowWidth = (numCols - 1) * gapX;
-                    const startX = (w - rowWidth) / 2;
+                    const startX = offsetX + (baseW - rowWidth) / 2;
                     for (let c = 0; c < numCols; c++) {
                         const px = startX + c * gapX;
                         const plinko = Matter.Bodies.circle(px, y + r * gapY, 18, { isStatic: true, label: 'plinko' });
@@ -265,9 +275,10 @@
                 y += rows * gapY + 350;
             } else if (dice < 0.5) {
                 // MOLINOS
-                const center = w * 0.2 + w * 0.6 * rand();
-                const bar1 = Matter.Bodies.rectangle(center, y, w * 0.35, 25, { label: 'molino' });
-                const bar2 = Matter.Bodies.rectangle(center, y, 25, w * 0.35, { label: 'molino' });
+                const center = offsetX + baseW * 0.2 + baseW * 0.6 * rand();
+                const barLength = baseW * 0.4;
+                const bar1 = Matter.Bodies.rectangle(center, y, barLength, 45, { label: 'molino' });
+                const bar2 = Matter.Bodies.rectangle(center, y, 45, barLength, { label: 'molino' });
                 const molino = Matter.Body.create({ parts: [bar1, bar2], isStatic: false, label: 'molino' });
                 molino.customSpin = (rand() < 0.5 ? 1 : -1) * (0.08 + rand() * 0.1);
                 molino.glowLife = 0; molino.glowColor = '#fff';
@@ -277,8 +288,8 @@
                 ]);
                 y += 600;
             } else if (dice < 0.65) {
-                // VORTEX (Huracán)
-                const center = w * 0.2 + w * 0.6 * rand();
+                // VORTEX
+                const center = offsetX + baseW * 0.2 + baseW * 0.6 * rand();
                 const radius = 200 + rand() * 100;
                 const vortex = Matter.Bodies.circle(center, y, radius, { isStatic: true, isSensor: true, label: 'vortex' });
                 vortex.vortexRadius = radius;
@@ -288,31 +299,24 @@
                 y += radius * 2 + 200;
             } else if (dice < 0.85) {
                 // ANILLOS GIRATORIOS
-                const center = w * 0.5;
+                const center = offsetX + baseW * 0.5;
                 const radius = 250;
-                const thickness = 40;
-                const numSlots = 4 + Math.floor(rand() * 3); // 4 a 6 ranuras
+                const thickness = 45;
+                const numSlots = 4 + Math.floor(rand() * 3);
                 const segments = [];
                 const angleStep = (Math.PI * 2) / numSlots;
-                const slotRatio = 0.3; // Hueco del 30% del arco
+                const slotRatio = 0.3;
 
                 for (let i = 0; i < numSlots; i++) {
-                    const startAngle = i * angleStep;
-                    const endAngle = startAngle + angleStep * (1 - slotRatio);
-                    const midAngle = (startAngle + endAngle) / 2;
+                    const midAngle = i * angleStep + (angleStep * (1 - slotRatio)) / 2;
                     const arcLength = radius * (angleStep * (1 - slotRatio));
-
                     const seg = Matter.Bodies.rectangle(
                         center + Math.cos(midAngle) * radius,
                         y + Math.sin(midAngle) * radius,
-                        arcLength, thickness, {
-                        angle: midAngle + Math.PI / 2,
-                        label: 'anillo'
-                    }
+                        arcLength, thickness, { angle: midAngle + Math.PI / 2, label: 'anillo' }
                     );
                     segments.push(seg);
                 }
-
                 const anillo = Matter.Body.create({ parts: segments, isStatic: false, label: 'anillo' });
                 anillo.customSpin = (rand() < 0.5 ? 1 : -1) * (0.04 + rand() * 0.04);
                 anillo.glowLife = 0; anillo.glowColor = '#fff';
@@ -322,8 +326,8 @@
                 ]);
                 y += radius * 2 + 400;
             } else {
-                // BUMPERS (Pinball)
-                const center = w * 0.2 + w * 0.6 * rand();
+                // BUMPERS
+                const center = offsetX + baseW * 0.2 + baseW * 0.6 * rand();
                 const bumper = Matter.Bodies.circle(center, y, 60, { isStatic: true, label: 'bumper' });
                 bumper.glowLife = 0; bumper.glowColor = '#fff';
                 Matter.Composite.add(State.world, bumper);
@@ -332,13 +336,13 @@
             y += rand() * 200;
         }
 
-        // Bloque de Seguridad antes de la meta (Embudo)
+        // Bloque de Seguridad antes de la meta (Embudo Aesthetic Centrado)
         Matter.Composite.add(State.world, [
-            Matter.Bodies.rectangle(w * 0.1, h - 600, w * 0.3, 40, { isStatic: true, angle: 0.5 }),
-            Matter.Bodies.rectangle(w * 0.9, h - 600, w * 0.3, 40, { isStatic: true, angle: -0.5 })
+            Matter.Bodies.rectangle(offsetX + baseW * 0.1, h - 600, baseW * 0.3, 45, { isStatic: true, angle: 0.5, label: 'wall' }),
+            Matter.Bodies.rectangle(offsetX + baseW * 0.9, h - 600, baseW * 0.3, 45, { isStatic: true, angle: -0.5, label: 'wall' })
         ]);
 
-        Matter.Composite.add(State.world, Matter.Bodies.rectangle(w / 2, h - 100, w, 30, { isStatic: true, isSensor: true, label: 'finish' }));
+        Matter.Composite.add(State.world, Matter.Bodies.rectangle(w / 2, h - 100, w * 3, 30, { isStatic: true, isSensor: true, label: 'finish' }));
     }
 
     function createMarbles(seed, count) {
@@ -528,67 +532,101 @@
         const ctx = State.ctx;
         const sorted = [...State.marbles].sort((a, b) => b.position.y - a.position.y);
         const w = State.currentFormat.w;
-        const panelW = 480, panelH = 680;
-        const x = w - panelW - 40, y = 40;
+        // Reducción del 20% (aprox)
+        const panelW = 380, panelH = 540;
+        const x = w - panelW - 30, y = 30;
 
-        // --- Panel Principal (Glassmorphism) ---
+        // --- Efecto Blur Cristal (Backdrop Blur) ---
+        // Capturamos lo que hay debajo para desenfocarlo
         ctx.save();
-        ctx.shadowBlur = 40; ctx.shadowColor = "rgba(0,0,0,0.5)";
-        ctx.fillStyle = "rgba(15, 15, 25, 0.85)";
-        if (ctx.roundRect) ctx.roundRect(x, y, panelW, panelH, 24).fill();
-        else ctx.fillRect(x, y, panelW, panelH);
+        if (ctx.filter !== undefined) {
+            // Creamos un canvas temporal solo si es necesario (para el blur)
+            if (!State.blurCanvas) State.blurCanvas = document.createElement('canvas');
+            State.blurCanvas.width = panelW;
+            State.blurCanvas.height = panelH;
+            const bctx = State.blurCanvas.getContext('2d');
 
-        // Borde fino brillante
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
-        ctx.lineWidth = 2;
+            // Copiamos la zona del canvas principal al temporal
+            bctx.drawImage(State.canvas, x, y, panelW, panelH, 0, 0, panelW, panelH);
+
+            // Dibujamos de vuelta con blur y oscurecimiento
+            ctx.filter = 'blur(15px) brightness(0.6)';
+            ctx.drawImage(State.blurCanvas, x, y);
+            ctx.filter = 'none';
+        }
+
+        // --- Panel Principal (Glassmorphism Premium) ---
+        ctx.shadowBlur = 30; ctx.shadowColor = "rgba(0,0,0,0.4)";
+
+        // Fondo muy transparente para dejar ver el blur (opacidad 0.3)
+        ctx.fillStyle = "rgba(15, 15, 30, 0.3)";
+        if (ctx.roundRect) {
+            ctx.roundRect(x, y, panelW, panelH, 20);
+            ctx.fill();
+        } else {
+            ctx.fillRect(x, y, panelW, panelH);
+        }
+
+        // Brillo superior (Efecto Apple) - Reparado el crash
+        const gradient = ctx.createLinearGradient(x, y, x, y + 40);
+        gradient.addColorStop(0, "rgba(255, 255, 255, 0.2)");
+        gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+        ctx.fillStyle = gradient;
+        if (ctx.roundRect) {
+            ctx.roundRect(x, y, panelW, 40, 20); // Usamos número simple por compatibilidad
+            ctx.fill();
+        }
+
+        // Borde fino de luz
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+        ctx.lineWidth = 1.5;
         ctx.stroke();
         ctx.restore();
 
-        // Título
-        ctx.fillStyle = "#0ef"; ctx.font = "bold 30px Outfit";
+        // Título más compacto
+        ctx.fillStyle = "#0ef"; ctx.font = "bold 24px Outfit";
         ctx.textAlign = "center";
-        ctx.fillText("LÍDERES KNIK", x + panelW / 2, y + 55);
+        ctx.fillText("LÍDERES KNIK", x + panelW / 2, y + 45);
 
-        // Línea divisoria
-        ctx.beginPath(); ctx.moveTo(x + 40, y + 75); ctx.lineTo(x + panelW - 40, y + 75);
-        ctx.strokeStyle = "rgba(0, 238, 255, 0.3)"; ctx.lineWidth = 1; ctx.stroke();
+        // Línea divisoria sutil
+        ctx.beginPath(); ctx.moveTo(x + 30, y + 65); ctx.lineTo(x + panelW - 30, y + 65);
+        ctx.strokeStyle = "rgba(0, 238, 255, 0.2)"; ctx.lineWidth = 1; ctx.stroke();
 
+        const rowH = 44;
         sorted.slice(0, 10).forEach((m, i) => {
-            const ty = y + 130 + i * 54;
+            const ty = y + 105 + i * rowH;
             const progress = Math.min(100, Math.max(0, (m.position.y / State.mapHeight) * 100));
 
-            // 1. Puesto y Medalla
+            // 1. Puesto / Medalla
             ctx.textAlign = "left";
             if (i < 3) {
-                const colors = ["#FFD700", "#C0C0C0", "#CD7F32"];
-                ctx.fillStyle = colors[i];
-                ctx.font = "bold 24px Outfit";
-                ctx.fillText(["🥇", "🥈", "🥉"][i], x + 25, ty);
-            } else {
-                ctx.fillStyle = "rgba(255,255,255,0.5)";
                 ctx.font = "20px Outfit";
-                ctx.fillText(i + 1, x + 35, ty);
+                ctx.fillText(["🥇", "🥈", "🥉"][i], x + 20, ty);
+            } else {
+                ctx.fillStyle = "rgba(255,255,255,0.4)";
+                ctx.font = "16px Outfit";
+                ctx.fillText(i + 1, x + 28, ty);
             }
 
-            // 2. Icono de Canica
+            // 2. Canica Mini
             ctx.fillStyle = m.customColor;
-            ctx.shadowBlur = 10; ctx.shadowColor = m.customColor;
-            ctx.beginPath(); ctx.arc(x + 85, ty - 8, 14, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 8; ctx.shadowColor = m.customColor;
+            ctx.beginPath(); ctx.arc(x + 65, ty - 6, 11, 0, Math.PI * 2); ctx.fill();
             ctx.shadowBlur = 0;
 
             // 3. Nombre
-            ctx.fillStyle = "#fff"; ctx.font = "bold 22px Outfit";
-            ctx.fillText(m.customName.substring(0, 14), x + 115, ty);
+            ctx.fillStyle = "#fff"; ctx.font = "bold 18px Outfit";
+            ctx.fillText(m.customName.substring(0, 12), x + 90, ty);
 
             // 4. Distancia
             ctx.textAlign = "right";
-            ctx.fillStyle = "rgba(255,255,255,0.8)";
-            ctx.font = "20px Outfit";
-            ctx.fillText(Math.round(m.position.y / 10) + "m", x + panelW - 30, ty);
+            ctx.fillStyle = "rgba(255,255,255,0.7)";
+            ctx.font = "16px Outfit";
+            ctx.fillText(Math.round(m.position.y / 10) + "m", x + panelW - 20, ty);
 
-            // 5. Barra de Progreso Mini
-            const barBoxX = x + 115, barBoxY = ty + 8, barW = panelW - 145, barH = 4;
-            ctx.fillStyle = "rgba(255,255,255,0.1)";
+            // 5. Barra de Progreso Minimalista
+            const barW = panelW - 110, barBoxX = x + 90, barBoxY = ty + 6, barH = 3;
+            ctx.fillStyle = "rgba(255,255,255,0.08)";
             ctx.fillRect(barBoxX, barBoxY, barW, barH);
             ctx.fillStyle = m.customColor;
             ctx.fillRect(barBoxX, barBoxY, (barW * progress) / 100, barH);
@@ -597,23 +635,44 @@
 
     function drawPodium() {
         const ctx = State.ctx;
-        const w = State.currentFormat.w, fade = State.podiumAlpha;
+        const w = State.currentFormat.w, h = State.currentFormat.h, fade = State.podiumAlpha;
         ctx.save(); ctx.globalAlpha = fade;
-        ctx.fillStyle = "rgba(0,0,0,0.98)"; ctx.fillRect(0, 0, w, State.currentFormat.h);
-        ctx.textAlign = "center"; ctx.fillStyle = "#0ef"; ctx.font = "bold 90px Outfit";
-        ctx.save(); ctx.translate(w / 2, 250); ctx.scale(0.85 + 0.15 * fade, 0.85 + 0.15 * fade); ctx.fillText("¡PODIO FINAL!", 0, 0); ctx.restore();
-        const cfg = [{ p: 2, x: -300, h: 250, c: "#C0C0C0", l: "2º" }, { p: 1, x: 0, h: 360, c: "#FFD700", l: "1º" }, { p: 3, x: 300, h: 180, c: "#CD7F32", l: "3º" }];
+        ctx.fillStyle = "rgba(0,0,0,0.98)"; ctx.fillRect(0, 0, w, h);
+
+        // Escala responsiva basada en la altura
+        const sFac = h / 1920;
+
+        ctx.textAlign = "center"; ctx.fillStyle = "#0ef"; ctx.font = `bold ${Math.round(90 * sFac)}px Outfit`;
+        ctx.save(); ctx.translate(w / 2, 200 * sFac); ctx.scale(0.85 + 0.15 * fade, 0.85 + 0.15 * fade); ctx.fillText("¡PODIO FINAL!", 0, 0); ctx.restore();
+
+        const cfg = [
+            { p: 2, x: -280 * sFac, h: 220 * sFac, c: "#C0C0C0", l: "2º" },
+            { p: 1, x: 0, h: 320 * sFac, c: "#FFD700", l: "1º" },
+            { p: 3, x: 280 * sFac, h: 160 * sFac, c: "#CD7F32", l: "3º" }
+        ];
+
+        const baseY = h * 0.85; // Podio anclado al 85% de la altura
         cfg.forEach(c => {
             const win = State.winners[c.p - 1]; if (!win) return;
-            const x = w / 2 + c.x, py = 1350;
-            ctx.fillStyle = c.c; ctx.fillRect(x - 140, py - c.h, 280, c.h);
+            const x = w / 2 + c.x;
+
+            // Plataforma
+            ctx.fillStyle = c.c;
+            ctx.fillRect(x - 130 * sFac, baseY - c.h, 260 * sFac, c.h);
+
+            // Canica Ganadora
             const tex = State.textureCache.get(win.id);
             if (tex) {
-                ctx.save(); ctx.translate(x, py - c.h - 150);
-                const s = 2.4 * fade; ctx.drawImage(tex, -tex.width * s / 2, -tex.height * s / 2, tex.width * s, tex.height * s);
+                ctx.save(); ctx.translate(x, baseY - c.h - 130 * sFac);
+                const s = 2.2 * sFac * fade;
+                ctx.drawImage(tex, -tex.width * s / 2, -tex.height * s / 2, tex.width * s, tex.height * s);
                 ctx.restore();
             }
-            ctx.fillStyle = "#fff"; ctx.font = "bold 45px Outfit"; ctx.fillText(win.name, x, py - c.h - 300);
+
+            // Nombre
+            ctx.fillStyle = "#fff";
+            ctx.font = `bold ${Math.round(40 * sFac)}px Outfit`;
+            ctx.fillText(win.name, x, baseY - c.h - 260 * sFac);
         });
         ctx.restore();
     }
@@ -650,7 +709,7 @@
             this.beginPath(); this.moveTo(x + r, y);
             this.arcTo(x + w, y, x + w, y + h, r); this.arcTo(x + w, y + h, x, y + h, r);
             this.arcTo(x, y + h, x, y, r); this.arcTo(x, y, x + w, y, r);
-            this.closePath(); return this;
+            this.closePath();
         };
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
