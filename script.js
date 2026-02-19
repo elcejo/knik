@@ -527,16 +527,71 @@
     function drawHUD() {
         const ctx = State.ctx;
         const sorted = [...State.marbles].sort((a, b) => b.position.y - a.position.y);
-        const x = State.currentFormat.w - 420, y = 40;
-        ctx.fillStyle = "rgba(10,10,15,0.9)";
-        if (ctx.roundRect) ctx.roundRect(x, y, 380, 480, 20).fill();
-        else ctx.fillRect(x, y, 380, 480);
-        ctx.fillStyle = "#0ef"; ctx.font = "bold 26px Outfit"; ctx.fillText("LÍDERES HQ", x + 30, y + 55);
-        sorted.slice(0, 8).forEach((m, i) => {
-            const ty = y + 110 + i * 44;
-            ctx.fillStyle = m.customColor; ctx.beginPath(); ctx.arc(x + 45, ty - 8, 14, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "#fff"; ctx.font = "22px Outfit"; ctx.fillText(`${i + 1}. ${m.customName.substring(0, 12)}`, x + 80, ty);
-            ctx.textAlign = "right"; ctx.fillText(Math.round(m.position.y / 10) + "m", x + 350, ty); ctx.textAlign = "left";
+        const w = State.currentFormat.w;
+        const panelW = 480, panelH = 680;
+        const x = w - panelW - 40, y = 40;
+
+        // --- Panel Principal (Glassmorphism) ---
+        ctx.save();
+        ctx.shadowBlur = 40; ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.fillStyle = "rgba(15, 15, 25, 0.85)";
+        if (ctx.roundRect) ctx.roundRect(x, y, panelW, panelH, 24).fill();
+        else ctx.fillRect(x, y, panelW, panelH);
+
+        // Borde fino brillante
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+
+        // Título
+        ctx.fillStyle = "#0ef"; ctx.font = "bold 30px Outfit";
+        ctx.textAlign = "center";
+        ctx.fillText("LÍDERES KNIK", x + panelW / 2, y + 55);
+
+        // Línea divisoria
+        ctx.beginPath(); ctx.moveTo(x + 40, y + 75); ctx.lineTo(x + panelW - 40, y + 75);
+        ctx.strokeStyle = "rgba(0, 238, 255, 0.3)"; ctx.lineWidth = 1; ctx.stroke();
+
+        sorted.slice(0, 10).forEach((m, i) => {
+            const ty = y + 130 + i * 54;
+            const progress = Math.min(100, Math.max(0, (m.position.y / State.mapHeight) * 100));
+
+            // 1. Puesto y Medalla
+            ctx.textAlign = "left";
+            if (i < 3) {
+                const colors = ["#FFD700", "#C0C0C0", "#CD7F32"];
+                ctx.fillStyle = colors[i];
+                ctx.font = "bold 24px Outfit";
+                ctx.fillText(["🥇", "🥈", "🥉"][i], x + 25, ty);
+            } else {
+                ctx.fillStyle = "rgba(255,255,255,0.5)";
+                ctx.font = "20px Outfit";
+                ctx.fillText(i + 1, x + 35, ty);
+            }
+
+            // 2. Icono de Canica
+            ctx.fillStyle = m.customColor;
+            ctx.shadowBlur = 10; ctx.shadowColor = m.customColor;
+            ctx.beginPath(); ctx.arc(x + 85, ty - 8, 14, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // 3. Nombre
+            ctx.fillStyle = "#fff"; ctx.font = "bold 22px Outfit";
+            ctx.fillText(m.customName.substring(0, 14), x + 115, ty);
+
+            // 4. Distancia
+            ctx.textAlign = "right";
+            ctx.fillStyle = "rgba(255,255,255,0.8)";
+            ctx.font = "20px Outfit";
+            ctx.fillText(Math.round(m.position.y / 10) + "m", x + panelW - 30, ty);
+
+            // 5. Barra de Progreso Mini
+            const barBoxX = x + 115, barBoxY = ty + 8, barW = panelW - 145, barH = 4;
+            ctx.fillStyle = "rgba(255,255,255,0.1)";
+            ctx.fillRect(barBoxX, barBoxY, barW, barH);
+            ctx.fillStyle = m.customColor;
+            ctx.fillRect(barBoxX, barBoxY, (barW * progress) / 100, barH);
         });
     }
 
